@@ -3,22 +3,22 @@
 =========
 tikzmagic
 =========
- 
+
 Magics for generating figures with TikZ.
- 
+
 .. note::
- 
+
   ``TikZ`` and ``LaTeX`` need to be installed separately.
- 
+
 Usage
 =====
- 
+
 ``%%tikz``
- 
+
 {TIKZ_DOC}
- 
+
 """
- 
+
 #-----------------------------------------------------------------------------
 #  Copyright (C) 2013 The IPython Development Team
 #
@@ -54,7 +54,7 @@ _mimetypes = {'png' : 'image/png',
               'svg' : 'image/svg+xml',
               'jpg' : 'image/jpeg',
               'jpeg': 'image/jpeg'}
- 
+
 @magics_class
 class TikzMagics(Magics):
     """A set of magics useful for creating figures with TikZ.
@@ -64,38 +64,38 @@ class TikzMagics(Magics):
         Parameters
         ----------
         shell : IPython shell
- 
+
         """
         super(TikzMagics, self).__init__(shell)
         self._plot_format = 'png'
- 
+
         # Allow publish_display_data to be overridden for
         # testing purposes.
         self._publish_display_data = publish_display_data
- 
- 
+
+
     def _fix_gnuplot_svg_size(self, image, size=None):
         """
         GnuPlot SVGs do not have height/width attributes.  Set
         these to be the same as the viewBox, so that the browser
         scales the image correctly.
- 
+
         Parameters
         ----------
         image : str
             SVG data.
         size : tuple of int
             Image width, height.
- 
+
         """
         (svg,) = minidom.parseString(image).getElementsByTagName('svg')
         viewbox = svg.getAttribute('viewBox').split(' ')
- 
+
         if size is not None:
             width, height = size
         else:
             width, height = viewbox[2:]
- 
+
         svg.setAttribute('width', '%dpx' % width)
         svg.setAttribute('height', '%dpx' % height)
         return svg.toxml()
@@ -148,31 +148,31 @@ class TikzMagics(Magics):
     def _convert_pdf_to_svg(self, dir):
         current_dir = getcwd()
         chdir(dir)
-        
+
         try:
             retcode = call("pdf2svg tikz.pdf tikz.svg", shell=True)
             if retcode != 0:
                 print("pdf2svg terminated with signal", -retcode, file=sys.stderr)
         except OSError as e:
             print("pdf2svg execution failed:", e, file=sys.stderr)
-        
+
         chdir(current_dir)
-        
- 
+
+
     def _convert_png_to_jpg(self, dir):
         current_dir = getcwd()
         chdir(dir)
-        
+
         try:
             retcode = call("convert tikz.png -quality 100 -background white -flatten tikz.jpg", shell=True)
             if retcode != 0:
                 print("convert terminated with signal", -retcode, file=sys.stderr)
         except OSError as e:
             print("convert execution failed:", e, file=sys.stderr)
- 
+
         chdir(current_dir)
-        
- 
+
+
     @skip_doctest
     @magic_arguments()
     @argument(
@@ -194,6 +194,11 @@ class TikzMagics(Magics):
     @argument(
         '-x', '--preamble', action='store', type=str, default='',
         help='LaTeX preamble to insert before tikz figure, e.g., -x $preamble, with preamble some string variable.'
+        )
+
+    @argument(
+        '-es', '--extrastyle', action='store', type=str, default='',
+        help='LaTeX extra styles for tikzmagic '
         )
     @argument(
         '-p', '--package', action='store', type=str, default='',
@@ -217,24 +222,24 @@ class TikzMagics(Magics):
     def tikz(self, line, cell=None, local_ns=None):
         '''
         Run TikZ code in LaTeX and plot result.
-        
+
             In [9]: %tikz \draw (0,0) rectangle (1,1);
- 
+
         As a cell, this will run a block of TikZ code::
- 
+
             In [10]: %%tikz
                ....: \draw (0,0) rectangle (1,1);
- 
+
         In the notebook, plots are published as the output of the cell.
- 
+
         The size and format of output plots can be specified::
- 
+
             In [18]: %%tikz -s 600,800 -f svg --scale 2
                 ...: \draw (0,0) rectangle (1,1);
                 ...: \filldraw (0.5,0.5) circle (.1);
- 
+
         TikZ packages can be loaded with -l package1,package2[,...]::
- 
+
             In [20]: %%tikz -l arrows,matrix
                 ...: \matrix (m) [matrix of math nodes, row sep=3em, column sep=4em] {
                 ...: A & B \\
@@ -245,9 +250,9 @@ class TikzMagics(Magics):
                 ...: (m-1-1) edge node [above] {$ab$} (m-1-2)
                 ...: (m-1-2) edge node [right] {$bd$} (m-2-2)
                 ...: (m-2-1) edge node [below] {$cd$} (m-2-2);
-        
+
         '''
-        
+
         # read arguments
         args = parse_argstring(self.tikz, line)
         scale = args.scale
@@ -257,7 +262,7 @@ class TikzMagics(Magics):
         encoding = args.encoding
         tikz_library = args.library.split(',')
         latex_package = args.package.split(',')
- 
+
         # arguments 'code' in line are prepended to the cell lines
         if cell is None:
             code = ''
@@ -265,58 +270,64 @@ class TikzMagics(Magics):
         else:
             code = cell
             return_output = False
- 
+
         code = str('').join(args.code) + code
- 
+
         # if there is no local namespace then default to an empty dict
         if local_ns is None:
             local_ns = {}
- 
+
         # generate plots in a temporary directory
         plot_dir = tempfile.mkdtemp().replace('\\', '/')
-        
+
         add_params = ""
-        
+
         if plot_format == 'png' or plot_format == 'jpg' or plot_format == 'jpeg':
             add_params += "density=300,"
-        
+
         tex = []
         tex.append('''
 \\documentclass[convert={%(add_params)ssize=%(width)sx%(height)s,outext=.png},border=0pt]{standalone}
 \\usepackage{tikz}
         ''' % locals())
-        
+
         for pkg in latex_package:
             tex.append('''
 \\usepackage{%s}
             ''' % pkg)
-        
+
         for lib in tikz_library:
             tex.append('''
 \\usetikzlibrary{%s}
             ''' % lib)
-        
+
         if args.preamble is not None:
             tex.append('''
 %s
             ''' % args.preamble)
-        
+
         tex.append('''
-\\begin{document}
+\\begin{document}''')
+        
+        if args.extrastyle is not None:
+            tex.append('''
+%s
+            ''' % args.extrastyle)
+        tex.append('''
 \\begin{tikzpicture}[scale=%(scale)s]
         ''' % locals())
-        
+
         tex.append(code)
-        
+
         tex.append('''
 \\end{tikzpicture}
 \\end{document}
         ''')
-        
+
         code = str('').join(tex)
 
         latex_log = self._run_latex(code, encoding, plot_dir)
-        
+
         key = 'TikZMagic.Tikz'
         display_data = []
 
@@ -332,7 +343,7 @@ class TikzMagics(Magics):
             self._convert_pdf_to_svg(plot_dir)
 
         image_filename = "%s/tikz.%s" % (plot_dir, plot_format)
-        
+
         # Publish image
         try:
             image = open(image_filename, 'rb').read()
@@ -341,29 +352,29 @@ class TikzMagics(Magics):
             if plot_format == 'svg':
                 image = self._fix_gnuplot_svg_size(image, size=(width, height))
             display_data.append((key, {plot_mime_type: image}))
- 
+
         except IOError:
             print("No image generated.", file=sys.stderr)
-        
+
         # Copy output file if requested
         if args.save is not None:
             copy(image_filename, args.save)
-        
+
         rmtree(plot_dir)
- 
+
         for tag, disp_d in display_data:
             if plot_format == 'svg':
-                # isolate data in an iframe, to prevent clashing glyph declarations in SVG 
+                # isolate data in an iframe, to prevent clashing glyph declarations in SVG
                 self._publish_display_data(source=tag, data=disp_d, metadata={'isolated' : 'true'})
             else:
                 self._publish_display_data(source=tag, data=disp_d, metadata=None)
- 
- 
+
+
 __doc__ = __doc__.format(
     TIKZ_DOC = ' '*8 + TikzMagics.tikz.__doc__,
     )
- 
- 
+
+
 def load_ipython_extension(ip):
     """Load the extension in IPython."""
     ip.register_magics(TikzMagics)
