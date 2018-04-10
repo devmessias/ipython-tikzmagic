@@ -179,6 +179,11 @@ class TikzMagics(Magics):
         '-sc', '--scale', action='store', type=str, default=1,
         help='Scaling factor of plots. Default is "--scale 1".'
         )
+
+    @argument(
+        '-t', '--tikz', action='store', type=str, default="node distance=2cm, scale=auto",
+        help='Scaling factor of plots. Default is "--scale 1".'
+        )
     @argument(
         '-s', '--size', action='store', type=str, default='400,240',
         help='Pixel size of plots, "width,height". Default is "--size 400,240".'
@@ -314,8 +319,8 @@ class TikzMagics(Magics):
 %s
             ''' % args.extrastyle)
         tex.append('''
-\\begin{tikzpicture}[scale=%(scale)s, node distance = 2cm, auto]
-        ''' % locals())
+\\begin{tikzpicture}[%s]
+        ''' % args.tikz)
 
         tex.append(code)
 
