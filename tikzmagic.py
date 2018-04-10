@@ -308,13 +308,13 @@ class TikzMagics(Magics):
 
         tex.append('''
 \\begin{document}''')
-        
+
         if args.extrastyle is not None:
             tex.append('''
 %s
             ''' % args.extrastyle)
         tex.append('''
-\\begin{tikzpicture}[scale=%(scale)s]
+\\begin{tikzpicture}[scale=%(scale)s, node distance = 2cm, auto]
         ''' % locals())
 
         tex.append(code)
